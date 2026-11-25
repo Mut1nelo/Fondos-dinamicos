@@ -1,0 +1,20 @@
+# Archivos temporales de Windows
+Thumbs.db
+Desktop.ini
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Archivos de respaldo
+*.bak
+*.old
+
+# Archivos generados
+__pycache__/
+*.pyc
+
+# Entornos virtuales de Python
+.venv/
+venv/
+env/

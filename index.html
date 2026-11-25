@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+
+<style>
+    html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: black;
+    }
+
+    .media {
+    	position: absolute;
+
+    	width: 100%;
+    	height: 100%;
+
+    	object-fit: contain;
+    	object-position: center;
+
+    	opacity: 0;
+    	transition: opacity 1.2s ease-in-out;
+    }
+
+    .visible {
+        opacity: 1;
+    }
+</style>
+</head>
+
+<body>
+
+<img id="imageA" class="media">
+<img id="imageB" class="media">
+
+<video id="videoA" class="media"></video>
+<video id="videoB" class="media"></video>
+
+<script src="playlist.js"></script>
+
+<script>
+
+/* 
+    En IMAGE_TIME es el tiempo en el que pasa una imagen en la pantalla.
+    Si quieres por ejemplo: que las imagenes pasen cada 40 segundos, en codigo debes agregar 3 ceros.
+    O sea: 40 -> 40000.
+*/
+const IMAGE_TIME = 60000;
+const FADE_TIME = 2200;
+
+const imageExtensions = [
+    "jpg", "jpeg", "png", "webp", "bmp", "gif"
+];
+
+const videoExtensions = [
+    "mp4", "webm", "mkv", "mov", "m4v"
+];
+
+const elements = [
+    document.getElementById("imageA"),
+    document.getElementById("imageB"),
+    document.getElementById("videoA"),
+    document.getElementById("videoB")
+];
+
+let currentElement = null;
+
+let imageTimer = null;
+let transitioning = false;
+let skipQueued = false;
+
+let shuffledPlaylist = [];
+let currentIndex = 0;
+let lastFile = null;
+
+function shuffleArray(array) {
+
+    const result = [...array];
+
+    for (let i = result.length - 1; i > 0; i--) {
+
+        const j = Math.floor(
+            Math.random() * (i + 1)
+        );
+
+        [result[i], result[j]] =
+            [result[j], result[i]];
+    }
+
+    return result;
+}
+
+function createNewShuffle() {
+
+    shuffledPlaylist = shuffleArray(PLAYLIST);
+
+    // Evita que el primer archivo del nuevo ciclo
+    // sea igual al último del ciclo anterior
+    if (
+        shuffledPlaylist.length > 1 &&
+        shuffledPlaylist[0] === lastFile
+    ) {
+        [
+            shuffledPlaylist[0],
+            shuffledPlaylist[1]
+        ] = [
+            shuffledPlaylist[1],
+            shuffledPlaylist[0]
+        ];
+    }
+
+    currentIndex = 0;
+}
+
+function randomFile() {
+
+    if (
+        shuffledPlaylist.length === 0 ||
+        currentIndex >= shuffledPlaylist.length
+    ) {
+        createNewShuffle();
+    }
+
+    const file =
+        shuffledPlaylist[currentIndex];
+
+    currentIndex++;
+
+    lastFile = file;
+
+    return file;
+}
+
+function extension(file) {
+
+    return file
+        .split(".")
+        .pop()
+        .toLowerCase();
+}
+
+function getFreeElement(type) {
+
+    if (type === "image") {
+
+        return [
+            document.getElementById("imageA"),
+            document.getElementById("imageB")
+        ].find(x => x !== currentElement);
+
+    }
+
+    return [
+        document.getElementById("videoA"),
+        document.getElementById("videoB")
+    ].find(x => x !== currentElement);
+}
+
+async function showNext() {
+
+    if (transitioning) {
+        return;
+    }
+
+    transitioning = true;
+
+    const file = randomFile();
+    const ext = extension(file);
+
+    let type;
+
+    if (imageExtensions.includes(ext)) {
+        type = "image";
+    }
+    else if (videoExtensions.includes(ext)) {
+        type = "video";
+    }
+    else {
+        transitioning = false;
+        showNext();
+        return;
+    }
+
+    const next = getFreeElement(type);
+
+    next.src = "Fondos/" + file;
+
+    if (type === "video") {
+
+        next.currentTime = 0;
+        next.loop = false;
+        next.muted = false;
+        next.volume = 1.0;
+
+        await next.play();
+    }
+
+    requestAnimationFrame(() => {
+
+        next.classList.add("visible");
+
+        if (currentElement) {
+            currentElement.classList.remove("visible");
+        }
+
+    });
+
+    await new Promise(
+        resolve => setTimeout(resolve, FADE_TIME)
+    );
+
+    if (currentElement) {
+
+        if (currentElement.tagName === "VIDEO") {
+
+            currentElement.onended = null;
+            currentElement.pause();
+            currentElement.removeAttribute("src");
+            currentElement.load();
+
+        }
+        else {
+
+            currentElement.removeAttribute("src");
+
+        }
+    }
+
+    currentElement = next;
+
+    if (type === "image") {
+
+        imageTimer = setTimeout(
+            skipCurrent,
+            IMAGE_TIME
+        );
+
+    }
+    else {
+
+        next.onended = () => {
+            skipCurrent();
+        };
+
+    }
+
+    transitioning = false;
+
+    if (skipQueued) {
+
+        skipQueued = false;
+        skipCurrent();
+
+    }
+}
+
+function skipCurrent() {
+
+    if (transitioning) {
+
+        skipQueued = true;
+        return;
+
+    }
+
+    if (imageTimer !== null) {
+
+        clearTimeout(imageTimer);
+        imageTimer = null;
+
+    }
+
+    if (
+        currentElement &&
+        currentElement.tagName === "VIDEO"
+    ) {
+
+        currentElement.onended = null;
+        currentElement.pause();
+
+    }
+
+    showNext();
+}
+
+document.addEventListener("click", (event) => {
+
+    if (event.button === 0) {
+        skipCurrent();
+    }
+
+});
+
+if (!PLAYLIST || PLAYLIST.length === 0) {
+
+    document.body.innerHTML =
+        "<h1 style='color:white'>No hay fondos.</h1>";
+
+}
+else {
+
+    showNext();
+
+}
+
+</script>
+
+</body>
+</html>
